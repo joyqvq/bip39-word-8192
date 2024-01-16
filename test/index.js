@@ -1,9 +1,10 @@
 var bip39 = require('../')
 var download = require('../util/wordlists').download
 var WORDLISTS = {
-  english: require('../src/wordlists/english.json'),
-  japanese: require('../src/wordlists/japanese.json'),
-  custom: require('./wordlist.json')
+  // english: require('../src/wordlists/english.json'),
+  english_8192: require('../src/wordlists/english_8192.json'),
+  // japanese: require('../src/wordlists/japanese.json'),
+  // custom: require('./wordlist.json')
 }
 
 var vectors = require('./vectors.json')
@@ -30,14 +31,15 @@ function testVector (description, wordlist, password, v, i) {
   })
 }
 
-vectors.english.forEach(function (v, i) { testVector('English', undefined, 'TREZOR', v, i) })
-vectors.japanese.forEach(function (v, i) { testVector('Japanese', WORDLISTS.japanese, '㍍ガバヴァぱばぐゞちぢ十人十色', v, i) })
-vectors.custom.forEach(function (v, i) { testVector('Custom', WORDLISTS.custom, undefined, v, i) })
+// vectors.english.forEach(function (v, i) { testVector('English', undefined, 'TREZOR', v, i) })
+// vectors.japanese.forEach(function (v, i) { testVector('Japanese', WORDLISTS.japanese, '㍍ガバヴァぱばぐゞちぢ十人十色', v, i) })
+// vectors.custom.forEach(function (v, i) { testVector('Custom', WORDLISTS.custom, undefined, v, i) })
+vectors.english_8192.forEach(function (v, i) { testVector('English 8192', WORDLISTS.english_8192, undefined, v, i) })
 
-test('getDefaultWordlist returns "english"', function (t) {
+test('getDefaultWordlist returns "english 8192"', function (t) {
   t.plan(1)
   const english = bip39.getDefaultWordlist()
-  t.equal(english, 'english')
+  t.equal(english, 'english 8192')
   // TODO: Test that Error throws when called if no wordlists are compiled with bip39
 })
 
@@ -134,7 +136,7 @@ test('validateMnemonic', function (t) {
 test('exposes standard wordlists', function (t) {
   t.plan(2)
   t.same(bip39.wordlists.EN, WORDLISTS.english)
-  t.equal(bip39.wordlists.EN.length, 2048)
+  t.equal(bip39.wordlists.EN.length, 8196)
 })
 
 test('verify wordlists from https://github.com/bitcoin/bips/blob/master/bip-0039/bip-0039-wordlists.md', function (t) {
