@@ -21,6 +21,7 @@ function lpad(str, padString, length) {
     return str;
 }
 function digitToBits(input) {
+    console.log(input);
     // Convert input to a number
     const num = parseInt(input, 10);
     // Check if the input is within the valid range
@@ -29,6 +30,7 @@ function digitToBits(input) {
     }
     // Convert the number to a binary string and pad to 3 bits
     const binaryString = num.toString(2).padStart(3, '0');
+    console.log(binaryString);
     return binaryString;
 }
 function binaryToByte(bin) {
@@ -80,7 +82,7 @@ function mnemonicToEntropy(mnemonic, wordlist) {
     // convert word indices to 13 bit binary strings
     const bits = words
         .map((word) => {
-        console.log(word);
+        // console.log(word);
         let res = word.split("-");
         let parsed = res[0] + "-";
         // console.log('parsed', parsed);
@@ -101,6 +103,7 @@ function mnemonicToEntropy(mnemonic, wordlist) {
     // const entropyBits = bits.slice(0, dividerIndex);
     // const checksumBits = bits.slice(dividerIndex);
     const entropyBits = bits;
+    console.log('entropyBitstk', entropyBits);
     // calculate the checksum and compare
     const entropyBytes = entropyBits.match(/(.{1,8})/g).map(binaryToByte);
     // if (entropyBytes.length < 16) {
