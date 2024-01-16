@@ -3,6 +3,8 @@
 // based on what is present. (Bundles may remove wordlists they don't need)
 const wordlists: { [index: string]: string[] } = {};
 let _default: string[] | undefined;
+let _default_8192: string[] | undefined;
+
 try {
   _default = require('./wordlists/czech.json');
   wordlists.czech = _default as string[];
@@ -41,10 +43,16 @@ try {
   wordlists.portuguese = _default as string[];
 } catch (err) {}
 try {
-  _default = require('./wordlists/english_8192.json');
+  _default = require('./wordlists/english.json');
   wordlists.english = _default as string[];
   wordlists.EN = _default as string[];
 } catch (err) {}
 
+try {
+  _default_8192 = require('./wordlists/english_8192.json');
+  wordlists.english_8192 = _default_8192 as string[];
+  wordlists.EN_8192 = _default_8192 as string[];
+} catch (err) {}
+
 // Last one to overwrite wordlist gets to be default.
-export { wordlists, _default };
+export { wordlists, _default, _default_8192 };

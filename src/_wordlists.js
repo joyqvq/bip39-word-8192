@@ -7,6 +7,8 @@ const wordlists = {};
 exports.wordlists = wordlists;
 let _default;
 exports._default = _default;
+let _default_8192;
+exports._default_8192 = _default_8192;
 try {
     exports._default = _default = require('./wordlists/czech.json');
     wordlists.czech = _default;
@@ -54,8 +56,14 @@ try {
 }
 catch (err) { }
 try {
-    exports._default = _default = require('./wordlists/english_8192.json');
+    exports._default = _default = require('./wordlists/english.json');
     wordlists.english = _default;
     wordlists.EN = _default;
+}
+catch (err) { }
+try {
+    exports._default_8192 = _default_8192 = require('./wordlists/english_8192.json');
+    wordlists.english_8192 = _default_8192;
+    wordlists.EN_8192 = _default_8192;
 }
 catch (err) { }

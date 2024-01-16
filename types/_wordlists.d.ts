@@ -2,4 +2,5 @@ declare const wordlists: {
     [index: string]: string[];
 };
 declare let _default: string[] | undefined;
-export { wordlists, _default };
+declare let _default_8192: string[] | undefined;
+export { wordlists, _default, _default_8192 };

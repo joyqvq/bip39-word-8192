@@ -1,14 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-// import { sha256 } from '@noble/hashes/sha256';
+const sha256_1 = require("@noble/hashes/sha256");
 const sha512_1 = require("@noble/hashes/sha512");
 const pbkdf2_1 = require("@noble/hashes/pbkdf2");
 const utils_1 = require("@noble/hashes/utils");
 const _wordlists_1 = require("./_wordlists");
 let DEFAULT_WORDLIST = _wordlists_1._default;
+let DEFAULT_WORDLIST_8192 = _wordlists_1._default_8192;
 const INVALID_MNEMONIC = 'Invalid mnemonic';
 const INVALID_ENTROPY = 'Invalid entropy';
-// const INVALID_CHECKSUM = 'Invalid mnemonic checksum';
+const INVALID_CHECKSUM = 'Invalid mnemonic checksum';
 const WORDLIST_REQUIRED = 'A wordlist is required but a default could not be found.\n' +
     'Please pass a 2048 word array explicitly.';
 function normalize(str) {
@@ -21,7 +22,6 @@ function lpad(str, padString, length) {
     return str;
 }
 function digitToBits(input) {
-    console.log(input);
     // Convert input to a number
     const num = parseInt(input, 10);
     // Check if the input is within the valid range
@@ -30,8 +30,16 @@ function digitToBits(input) {
     }
     // Convert the number to a binary string and pad to 3 bits
     const binaryString = num.toString(2).padStart(3, '0');
-    console.log(binaryString);
     return binaryString;
+}
+function bitsToDigit(binary) {
+    // Check if the input is a valid 3-bit string
+    if (binary.length !== 3 || !/^[01]+$/.test(binary)) {
+        throw new Error("Input must a 3 bit string");
+    }
+    // Convert binary string to integer
+    const integerValue = parseInt(binary, 2);
+    return integerValue.toString();
 }
 function binaryToByte(bin) {
     return parseInt(bin, 2);
@@ -39,12 +47,12 @@ function binaryToByte(bin) {
 function bytesToBinary(bytes) {
     return bytes.map((x) => lpad(x.toString(2), '0', 8)).join('');
 }
-// function deriveChecksumBits(entropyBuffer: Buffer): string {
-//   const ENT = entropyBuffer.length * 8;
-//   const CS = ENT / 32;
-//   const hash = sha256(Uint8Array.from(entropyBuffer));
-//   return bytesToBinary(Array.from(hash)).slice(0, CS);
-// }
+function deriveChecksumBits(entropyBuffer) {
+    const ENT = entropyBuffer.length * 8;
+    const CS = ENT / 32;
+    const hash = sha256_1.sha256(Uint8Array.from(entropyBuffer));
+    return bytesToBinary(Array.from(hash)).slice(0, CS);
+}
 function salt(password) {
     return 'mnemonic' + (password || '');
 }
@@ -103,7 +111,6 @@ function mnemonicToEntropy(mnemonic, wordlist) {
     // const entropyBits = bits.slice(0, dividerIndex);
     // const checksumBits = bits.slice(dividerIndex);
     const entropyBits = bits;
-    console.log('entropyBitstk', entropyBits);
     // calculate the checksum and compare
     const entropyBytes = entropyBits.match(/(.{1,8})/g).map(binaryToByte);
     // if (entropyBytes.length < 16) {
@@ -147,10 +154,18 @@ function entropyToMnemonic(entropy, wordlist) {
     // const checksumBits = deriveChecksumBits(entropy);
     // const bits = entropyBits + checksumBits;
     const bits = entropyBits;
-    const chunks = bits.match(/(.{1,11})/g);
+    const chunks = bits.match(/(.{1,16})/g);
+    // console.log('chunk', chunks.length);
     const words = chunks.map((binary) => {
-        const index = binaryToByte(binary);
-        return wordlist[index];
+        // Extract the first 13 bits
+        const bits13 = binary.slice(0, 13);
+        const index = binaryToByte(bits13);
+        const word = wordlist[index];
+        // Extract the last 3 bits
+        const bits3 = binary.slice(13);
+        const digit = bitsToDigit(bits3);
+        const combined = word + digit;
+        return combined;
     });
     return wordlist[0] === '\u3042\u3044\u3053\u304f\u3057\u3093' // Japanese wordlist
         ? words.join('\u3000')
@@ -201,5 +216,106 @@ function getDefaultWordlist() {
     })[0];
 }
 exports.getDefaultWordlist = getDefaultWordlist;
+function convertLegacyToCompressed(mnemonic, wordlistLegacy, wordlist8192) {
+    wordlistLegacy = wordlistLegacy || DEFAULT_WORDLIST;
+    wordlist8192 = wordlist8192 || DEFAULT_WORDLIST_8192;
+    if (!wordlistLegacy || !wordlist8192) {
+        throw new Error(WORDLIST_REQUIRED);
+    }
+    const legacyWords = normalize(mnemonic).split(' ');
+    if (legacyWords.length !== 12) {
+        throw new Error("only 12 word legacy mnemonics are supported for conversion");
+    }
+    let entropy = legacyMnemonicToEntropyBytes(mnemonic, wordlistLegacy);
+    return entropyToMnemonic(entropy, wordlist8192);
+}
+exports.convertLegacyToCompressed = convertLegacyToCompressed;
+function convertCompressedToLegacy(mnemonic, wordlistLegacy, wordlist8192) {
+    wordlistLegacy = wordlistLegacy || DEFAULT_WORDLIST;
+    wordlist8192 = wordlist8192 || DEFAULT_WORDLIST_8192;
+    if (!wordlistLegacy || !wordlist8192) {
+        throw new Error(WORDLIST_REQUIRED);
+    }
+    const compressedWords = normalize(mnemonic).split(' ');
+    if (compressedWords.length !== 8) {
+        throw new Error("Compressed mneomonics must be length 8");
+    }
+    let entropy = mnemonicToEntropy(mnemonic, wordlist8192);
+    return entropyToLegacyMnemonic(entropy, wordlistLegacy);
+}
+exports.convertCompressedToLegacy = convertCompressedToLegacy;
+function entropyToLegacyMnemonic(entropy, wordlist) {
+    if (!Buffer.isBuffer(entropy)) {
+        entropy = Buffer.from(entropy, 'hex');
+    }
+    wordlist = wordlist || DEFAULT_WORDLIST;
+    if (!wordlist) {
+        throw new Error(WORDLIST_REQUIRED);
+    }
+    // 128 <= ENT <= 256
+    if (entropy.length < 16) {
+        throw new TypeError(INVALID_ENTROPY);
+    }
+    if (entropy.length > 32) {
+        throw new TypeError(INVALID_ENTROPY);
+    }
+    if (entropy.length % 4 !== 0) {
+        throw new TypeError(INVALID_ENTROPY);
+    }
+    const entropyBits = bytesToBinary(Array.from(entropy));
+    const checksumBits = deriveChecksumBits(entropy);
+    const bits = entropyBits + checksumBits;
+    const chunks = bits.match(/(.{1,11})/g);
+    const words = chunks.map((binary) => {
+        const index = binaryToByte(binary);
+        return wordlist[index];
+    });
+    return wordlist[0] === '\u3042\u3044\u3053\u304f\u3057\u3093' // Japanese wordlist
+        ? words.join('\u3000')
+        : words.join(' ');
+}
+exports.entropyToLegacyMnemonic = entropyToLegacyMnemonic;
+function legacyMnemonicToEntropyBytes(mnemonic, wordlist) {
+    wordlist = wordlist || DEFAULT_WORDLIST;
+    if (!wordlist) {
+        throw new Error(WORDLIST_REQUIRED);
+    }
+    const words = normalize(mnemonic).split(' ');
+    if (words.length % 3 !== 0) {
+        throw new Error(INVALID_MNEMONIC);
+    }
+    // convert word indices to 11 bit binary strings
+    const bits = words
+        .map((word) => {
+        const index = wordlist.indexOf(word);
+        if (index === -1) {
+            throw new Error(INVALID_MNEMONIC);
+        }
+        return lpad(index.toString(2), '0', 11);
+    })
+        .join('');
+    // split the binary string into ENT/CS
+    const dividerIndex = Math.floor(bits.length / 33) * 32;
+    const entropyBits = bits.slice(0, dividerIndex);
+    const checksumBits = bits.slice(dividerIndex);
+    // calculate the checksum and compare
+    const entropyBytes = entropyBits.match(/(.{1,8})/g).map(binaryToByte);
+    if (entropyBytes.length !== 16) {
+        throw new Error(INVALID_ENTROPY);
+    }
+    // if (entropyBytes.length > 32) {
+    //   throw new Error(INVALID_ENTROPY);
+    // }
+    // if (entropyBytes.length % 4 !== 0) {
+    //   throw new Error(INVALID_ENTROPY);
+    // }
+    const entropy = Buffer.from(entropyBytes);
+    const newChecksum = deriveChecksumBits(entropy);
+    if (newChecksum !== checksumBits) {
+        throw new Error(INVALID_CHECKSUM);
+    }
+    return entropy.toString('hex');
+}
+exports.legacyMnemonicToEntropyBytes = legacyMnemonicToEntropyBytes;
 var _wordlists_2 = require("./_wordlists");
 exports.wordlists = _wordlists_2.wordlists;

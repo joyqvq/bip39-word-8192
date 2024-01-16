@@ -7,4 +7,8 @@ export declare function generateMnemonic(strength?: number, rng?: (size: number)
 export declare function validateMnemonic(mnemonic: string, wordlist?: string[]): boolean;
 export declare function setDefaultWordlist(language: string): void;
 export declare function getDefaultWordlist(): string;
+export declare function convertLegacyToCompressed(mnemonic: string, wordlistLegacy?: string[], wordlist8192?: string[]): string;
+export declare function convertCompressedToLegacy(mnemonic: string, wordlistLegacy?: string[], wordlist8192?: string[]): string;
+export declare function entropyToLegacyMnemonic(entropy: Buffer | string, wordlist?: string[]): string;
+export declare function legacyMnemonicToEntropyBytes(mnemonic: string, wordlist?: string[]): string;
 export { wordlists } from './_wordlists';
