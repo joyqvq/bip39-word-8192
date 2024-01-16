@@ -317,5 +317,9 @@ function legacyMnemonicToEntropyBytes(mnemonic, wordlist) {
     return entropy.toString('hex');
 }
 exports.legacyMnemonicToEntropyBytes = legacyMnemonicToEntropyBytes;
+function tryFromPartialCompressedMnemonics(mnemonic, wordlist) {
+    return "";
+}
+exports.tryFromPartialCompressedMnemonics = tryFromPartialCompressedMnemonics;
 var _wordlists_2 = require("./_wordlists");
 exports.wordlists = _wordlists_2.wordlists;

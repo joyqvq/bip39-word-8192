@@ -406,4 +406,10 @@ export function legacyMnemonicToEntropyBytes(
   return entropy.toString('hex');
 }
 
+export function tryFromPartialCompressedMnemonics(
+  mnemonic: string,
+  wordlist?: string[],
+): string {
+  return ""
+}
 export { wordlists } from './_wordlists';
