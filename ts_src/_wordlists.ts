@@ -50,8 +50,8 @@ try {
 
 try {
   _default_8192 = require('./wordlists/english_8192.json');
-  wordlists.english_8192 = _default_8192 as string[];
-  wordlists.EN_8192 = _default_8192 as string[];
+  wordlists.english8192 = _default_8192 as string[];
+  wordlists.EN8192 = _default_8192 as string[];
 } catch (err) {}
 
 // Last one to overwrite wordlist gets to be default.

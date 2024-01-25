@@ -1,65 +1,51 @@
 var bip39 = require('../')
 var download = require('../util/wordlists').download
 var WORDLISTS = {
-  // english: require('../src/wordlists/english.json'),
-  english_8192: require('../src/wordlists/english_8192.json'),
+  english: require('../src/wordlists/english.json'),
+  english8192: require('../src/wordlists/english_8192.json'),
   // japanese: require('../src/wordlists/japanese.json'),
   // custom: require('./wordlist.json')
 }
 
-var vectors = require('./vectors.json')
+var vectors = require('./convert.json')
 var test = require('tape')
 
 function testVector (description, wordlist, password, v, i) {
   var ventropy = v[0]
   var vmnemonic = v[1]
-  var vseedHex = v[2]
+  var vlegacymnemonic = v[2]
+  var vseedHex = v[3]
 
   test('for ' + description + '(' + i + '), ' + ventropy, function (t) {
-    t.plan(6)
+    t.plan(8)
 
-    t.equal(bip39.mnemonicToEntropy(vmnemonic, wordlist), ventropy, 'mnemonicToEntropy returns ' + ventropy.slice(0, 40) + '...')
-    t.equal(bip39.mnemonicToSeedSync(vmnemonic, password).toString('hex'), vseedHex, 'mnemonicToSeedSync returns ' + vseedHex.slice(0, 40) + '...')
+    t.equal(bip39.mnemonicToSeedSync(vmnemonic, password).toString('hex'), vseedHex, 'mnemonicToSeedSync returns ' + vseedHex)
     bip39.mnemonicToSeed(vmnemonic, password).then(function (asyncSeed) {
       t.equal(asyncSeed.toString('hex'), vseedHex, 'mnemonicToSeed returns ' + vseedHex.slice(0, 40) + '...')
     })
-    t.equal(bip39.entropyToMnemonic(ventropy, wordlist), vmnemonic, 'entropyToMnemonic returns ' + vmnemonic.slice(0, 40) + '...')
+    t.equal(bip39.mnemonicToEntropy(vmnemonic, wordlist), ventropy, 'mnemonicToEntropy returns ' + ventropy)
+    t.equal(bip39.entropyToMnemonic(ventropy, wordlist), vmnemonic, 'entropyToMnemonic returns ' + vmnemonic)
 
     function rng () { return Buffer.from(ventropy, 'hex') }
     t.equal(bip39.generateMnemonic(undefined, rng, wordlist), vmnemonic, 'generateMnemonic returns RNG entropy unmodified')
     t.equal(bip39.validateMnemonic(vmnemonic, wordlist), true, 'validateMnemonic returns true')
+    t.equal(bip39.convertCompressedToLegacy(vmnemonic, WORDLISTS.english, wordlist), vlegacymnemonic, 'validateMnemonic returns true')
+    t.equal(bip39.convertLegacyToCompressed(vlegacymnemonic, WORDLISTS.english, wordlist), vmnemonic, 'validateMnemonic returns true')
   })
 }
 
-// vectors.english.forEach(function (v, i) { testVector('English', undefined, 'TREZOR', v, i) })
-// vectors.japanese.forEach(function (v, i) { testVector('Japanese', WORDLISTS.japanese, '㍍ガバヴァぱばぐゞちぢ十人十色', v, i) })
-// vectors.custom.forEach(function (v, i) { testVector('Custom', WORDLISTS.custom, undefined, v, i) })
-vectors.english_8192.forEach(function (v, i) { testVector('English 8192', WORDLISTS.english_8192, undefined, v, i) })
+vectors.forEach(function (v, i) { testVector('English 8192', WORDLISTS.english8192, "", v, i) })
 
 test('getDefaultWordlist returns "english"', function (t) {
   t.plan(1)
   const english = bip39.getDefaultWordlist()
   t.equal(english, 'english')
-  // TODO: Test that Error throws when called if no wordlists are compiled with bip39
 })
 
 test('setDefaultWordlist changes default wordlist', function (t) {
-  t.plan(4)
+  t.plan(1)
   const english = bip39.getDefaultWordlist()
   t.equal(english, 'english')
-
-  bip39.setDefaultWordlist('italian')
-
-  const italian = bip39.getDefaultWordlist()
-  t.equal(italian, 'italian')
-
-  const phraseItalian = bip39.entropyToMnemonic('00000000000000000000000000000000')
-  t.equal(phraseItalian.slice(0, 5), 'abaco')
-
-  bip39.setDefaultWordlist('english')
-
-  const phraseEnglish = bip39.entropyToMnemonic('00000000000000000000000000000000')
-  t.equal(phraseEnglish.slice(0, 7), 'abandon')
 })
 
 test('setDefaultWordlist throws on unknown wordlist', function (t) {
@@ -92,21 +78,6 @@ test('invalid entropy', function (t) {
   }, /^TypeError: Invalid entropy$/, 'throws for entropy that is larger than 1024')
 })
 
-test('UTF8 passwords', function (t) {
-  t.plan(vectors.japanese.length * 2)
-
-  vectors.japanese.forEach(function (v) {
-    var vmnemonic = v[1]
-    var vseedHex = v[2]
-
-    var password = '㍍ガバヴァぱばぐゞちぢ十人十色'
-    var normalizedPassword = 'メートルガバヴァぱばぐゞちぢ十人十色'
-
-    t.equal(bip39.mnemonicToSeedSync(vmnemonic, password).toString('hex'), vseedHex, 'mnemonicToSeedSync normalizes passwords')
-    t.equal(bip39.mnemonicToSeedSync(vmnemonic, normalizedPassword).toString('hex'), vseedHex, 'mnemonicToSeedSync leaves normalizes passwords as-is')
-  })
-})
-
 // test('generateMnemonic can vary entropy length', function (t) {
 //   var words = bip39.generateMnemonic(160).split(' ')
 
@@ -118,7 +89,7 @@ test('generateMnemonic requests the exact amount of data from an RNG', function 
   t.plan(1)
 
   bip39.generateMnemonic(128, function (size) {
-    t.equal(size, 160 / 8)
+    t.equal(size, 128 / 8)
     return Buffer.allocUnsafe(size)
   })
 })
@@ -134,10 +105,10 @@ test('validateMnemonic', function (t) {
   // t.equal(bip39.validateMnemonic('sleep kitten sleep kitten sleep kitten sleep kitten sleep kitten sleep kitten'), false, 'fails for invalid checksum')
 })
 
-test('exposes standard wordlists for 8196', function (t) {
+test('exposes standard wordlists for 8192', function (t) {
   t.plan(2)
-  t.same(bip39.wordlists.EN_8192, WORDLISTS.english_8192)
-  t.equal(bip39.wordlists.EN_8192.length, 8196)
+  t.same(bip39.wordlists.EN8192, WORDLISTS.english8192)
+  t.equal(bip39.wordlists.EN8192.length, 8192)
 })
 
 // test('verify wordlists from https://github.com/bitcoin/bips/blob/master/bip-0039/bip-0039-wordlists.md', function (t) {

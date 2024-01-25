@@ -2,7 +2,11 @@ import { sha256 } from '@noble/hashes/sha256';
 import { sha512 } from '@noble/hashes/sha512';
 import { pbkdf2, pbkdf2Async } from '@noble/hashes/pbkdf2';
 import { randomBytes } from '@noble/hashes/utils';
-import { _default as _DEFAULT_WORDLIST, _default_8192 as _DEFAULT_WORDLIST_8192, wordlists } from './_wordlists';
+import {
+  _default as _DEFAULT_WORDLIST,
+  _default_8192 as _DEFAULT_WORDLIST_8192,
+  wordlists,
+} from './_wordlists';
 
 let DEFAULT_WORDLIST: string[] | undefined = _DEFAULT_WORDLIST;
 let DEFAULT_WORDLIST_8192: string[] | undefined = _DEFAULT_WORDLIST_8192;
@@ -31,7 +35,7 @@ function digitToBits(input: string): string {
 
   // Check if the input is within the valid range
   if (num < 0 || num > 7 || isNaN(num)) {
-      throw new Error("Input must be one of 0, 1, 2, 3, 4, 5, 6, 7.");
+    throw new Error('Input must be one of 0, 1, 2, 3, 4, 5, 6, 7.');
   }
 
   // Convert the number to a binary string and pad to 3 bits
@@ -42,7 +46,7 @@ function digitToBits(input: string): string {
 function bitsToDigit(binary: string): string {
   // Check if the input is a valid 3-bit string
   if (binary.length !== 3 || !/^[01]+$/.test(binary)) {
-    throw new Error("Input must a 3 bit string");
+    throw new Error('Input must a 3 bit string');
   }
   // Convert binary string to integer
   const integerValue = parseInt(binary, 2);
@@ -72,13 +76,15 @@ export function mnemonicToSeedSync(
   mnemonic: string,
   password?: string,
 ): Buffer {
-  const mnemonicBuffer = Uint8Array.from(
-    Buffer.from(normalize(mnemonic), 'utf8'),
+  const entropy = mnemonicToEntropy(mnemonic);
+  const legacyMnemonic = entropyToLegacyMnemonic(entropy);
+  const legacyMnemonicBuffer = Uint8Array.from(
+    Buffer.from(normalize(legacyMnemonic), 'utf8'),
   );
   const saltBuffer = Uint8Array.from(
     Buffer.from(salt(normalize(password)), 'utf8'),
   );
-  const res = pbkdf2(sha512, mnemonicBuffer, saltBuffer, {
+  const res = pbkdf2(sha512, legacyMnemonicBuffer, saltBuffer, {
     c: 2048,
     dkLen: 64,
   });
@@ -89,13 +95,16 @@ export function mnemonicToSeed(
   mnemonic: string,
   password?: string,
 ): Promise<Buffer> {
-  const mnemonicBuffer = Uint8Array.from(
-    Buffer.from(normalize(mnemonic), 'utf8'),
+  const entropy = mnemonicToEntropy(mnemonic);
+  const legacyMnemonic = entropyToLegacyMnemonic(entropy);
+
+  const legacyMnemonicBuffer = Uint8Array.from(
+    Buffer.from(normalize(legacyMnemonic), 'utf8'),
   );
   const saltBuffer = Uint8Array.from(
     Buffer.from(salt(normalize(password)), 'utf8'),
   );
-  return pbkdf2Async(sha512, mnemonicBuffer, saltBuffer, {
+  return pbkdf2Async(sha512, legacyMnemonicBuffer, saltBuffer, {
     c: 2048,
     dkLen: 64,
   }).then((res: Uint8Array): Buffer => Buffer.from(res));
@@ -105,27 +114,18 @@ export function mnemonicToEntropy(
   mnemonic: string,
   wordlist?: string[],
 ): string {
-  wordlist = wordlist || DEFAULT_WORDLIST;
+  wordlist = wordlist || DEFAULT_WORDLIST_8192;
   if (!wordlist) {
     throw new Error(WORDLIST_REQUIRED);
   }
 
   const words = normalize(mnemonic).split(' ');
-  // if (words.length % 3 !== 0) {
-  //   throw new Error(INVALID_MNEMONIC);
-  // }
-  // console.log(words);
-  // console.log(wordlist.length);
-  // console.log(mnemonic);
-
-  // convert word indices to 13 bit binary strings
-  const bits = words
+  let digits = '';
+  let bits = words
     .map(
       (word: string): string => {
-        // console.log(word);
-        let res: string[] = word.split("-");
-        let parsed = res[0] + "-";
-        // console.log('parsed', parsed);
+        const res: string[] = word.split('-');
+        const parsed = res[0] + '-';
 
         const index = wordlist!.indexOf(parsed);
         const digit = res[1];
@@ -135,38 +135,20 @@ export function mnemonicToEntropy(
 
         const s0 = lpad(index.toString(2), '0', 13);
         const s1 = digitToBits(digit);
-        const combined = s0 + s1;
-        // console.log('combined', combined);
-        return combined;
+        digits += s1;
+        return s0;
       },
     )
     .join('');
 
-  // split the binary string into ENT/CS
-  // const dividerIndex = Math.floor(bits.length / 33) * 32;
-  // const entropyBits = bits.slice(0, dividerIndex);
-  // const checksumBits = bits.slice(dividerIndex);
+  bits += digits;
   const entropyBits = bits;
-
-  // calculate the checksum and compare
   const entropyBytes = entropyBits.match(/(.{1,8})/g)!.map(binaryToByte);
-  // if (entropyBytes.length < 16) {
-  //   throw new Error(INVALID_ENTROPY);
-  // }
-  // if (entropyBytes.length > 32) {
-  //   throw new Error(INVALID_ENTROPY);
-  // }
   if (entropyBytes.length !== 16) {
     throw new Error(INVALID_ENTROPY);
   }
-
   const entropy = Buffer.from(entropyBytes);
-  // const newChecksum = deriveChecksumBits(entropy);
-  // if (newChecksum !== checksumBits) {
-  //   throw new Error(INVALID_CHECKSUM);
-  // }
   const hex = entropy.toString('hex');
-  console.log('entropytk', hex);
   return hex;
 }
 
@@ -177,47 +159,35 @@ export function entropyToMnemonic(
   if (!Buffer.isBuffer(entropy)) {
     entropy = Buffer.from(entropy, 'hex');
   }
-  wordlist = wordlist || DEFAULT_WORDLIST;
+  wordlist = wordlist || DEFAULT_WORDLIST_8192;
   if (!wordlist) {
     throw new Error(WORDLIST_REQUIRED);
   }
 
-  // 128 <= ENT <= 256
-  // if (entropy.length < 16) {
-  //   throw new TypeError(INVALID_ENTROPY);
-  // }
-  // if (entropy.length > 32) {
-  //   throw new TypeError(INVALID_ENTROPY);
-  // }
   if (entropy.length !== 16) {
     throw new TypeError(INVALID_ENTROPY);
   }
 
-  const entropyBits = bytesToBinary(Array.from(entropy));
-  // const checksumBits = deriveChecksumBits(entropy);
+  const bits = bytesToBinary(Array.from(entropy));
+  const chunks = bits.slice(0, 104).match(/(.{1,13})/g)!;
 
-  // const bits = entropyBits + checksumBits;
-  const bits = entropyBits;
-  const chunks = bits.match(/(.{1,16})/g)!;
-  // console.log('chunk', chunks.length);
   const words = chunks.map(
     (binary: string): string => {
-    // Extract the first 13 bits
-    const bits13 = binary.slice(0, 13);
-    const index = binaryToByte(bits13);
-    const word = wordlist![index];
-
-    // Extract the last 3 bits
-    const bits3 = binary.slice(13);
-    const digit = bitsToDigit(bits3);
-    const combined = word + digit;
-      return combined;
+      const index = binaryToByte(binary);
+      const word = wordlist![index];
+      return word;
     },
   );
 
-  return wordlist[0] === '\u3042\u3044\u3053\u304f\u3057\u3093' // Japanese wordlist
-    ? words.join('\u3000')
-    : words.join(' ');
+  const chunks2 = bits.slice(104).match(/(.{1,3})/g)!;
+  const digits = chunks2.map(
+    (binary: string): string => {
+      return bitsToDigit(binary);
+    },
+  );
+
+  const zipped = words.map((item1, index) => item1 + digits[index]);
+  return zipped.join(' ');
 }
 
 export function generateMnemonic(
@@ -229,7 +199,7 @@ export function generateMnemonic(
   // if (strength % 32 !== 0) {
   //   throw new TypeError(INVALID_ENTROPY);
   // }
-  if (strength !== 128 ) {
+  if (strength !== 128) {
     throw new TypeError(INVALID_ENTROPY);
   }
   rng = rng || ((size: number): Buffer => Buffer.from(randomBytes(size)));
@@ -253,6 +223,7 @@ export function setDefaultWordlist(language: string): void {
   const result = wordlists[language];
   if (result) {
     DEFAULT_WORDLIST = result;
+    DEFAULT_WORDLIST_8192 = wordlists['EN8192'];
   } else {
     throw new Error('Could not find wordlist for language "' + language + '"');
   }
@@ -278,7 +249,7 @@ export function getDefaultWordlist(): string {
 export function convertLegacyToCompressed(
   mnemonic: string,
   wordlistLegacy?: string[],
-  wordlist8192?: string[]
+  wordlist8192?: string[],
 ): string {
   wordlistLegacy = wordlistLegacy || DEFAULT_WORDLIST;
   wordlist8192 = wordlist8192 || DEFAULT_WORDLIST_8192;
@@ -288,16 +259,18 @@ export function convertLegacyToCompressed(
 
   const legacyWords = normalize(mnemonic).split(' ');
   if (legacyWords.length !== 12) {
-    throw new Error("only 12 word legacy mnemonics are supported for conversion");
+    throw new Error(
+      'only 12 word legacy mnemonics are supported for conversion',
+    );
   }
-  let entropy = legacyMnemonicToEntropyBytes(mnemonic, wordlistLegacy);
-  return entropyToMnemonic(entropy, wordlist8192)
+  const entropy = legacyMnemonicToEntropy(mnemonic, wordlistLegacy);
+  return entropyToMnemonic(entropy, wordlist8192);
 }
 
 export function convertCompressedToLegacy(
   mnemonic: string,
   wordlistLegacy?: string[],
-  wordlist8192?: string[]
+  wordlist8192?: string[],
 ): string {
   wordlistLegacy = wordlistLegacy || DEFAULT_WORDLIST;
   wordlist8192 = wordlist8192 || DEFAULT_WORDLIST_8192;
@@ -307,10 +280,10 @@ export function convertCompressedToLegacy(
 
   const compressedWords = normalize(mnemonic).split(' ');
   if (compressedWords.length !== 8) {
-    throw new Error("Compressed mneomonics must be length 8");
+    throw new Error('Compressed mneomonics must be length 8');
   }
-  let entropy = mnemonicToEntropy(mnemonic, wordlist8192);
-  return entropyToLegacyMnemonic(entropy, wordlistLegacy)
+  const entropy = mnemonicToEntropy(mnemonic, wordlist8192);
+  return entropyToLegacyMnemonic(entropy, wordlistLegacy);
 }
 
 export function entropyToLegacyMnemonic(
@@ -353,7 +326,7 @@ export function entropyToLegacyMnemonic(
     : words.join(' ');
 }
 
-export function legacyMnemonicToEntropyBytes(
+export function legacyMnemonicToEntropy(
   mnemonic: string,
   wordlist?: string[],
 ): string {
@@ -391,12 +364,6 @@ export function legacyMnemonicToEntropyBytes(
   if (entropyBytes.length !== 16) {
     throw new Error(INVALID_ENTROPY);
   }
-  // if (entropyBytes.length > 32) {
-  //   throw new Error(INVALID_ENTROPY);
-  // }
-  // if (entropyBytes.length % 4 !== 0) {
-  //   throw new Error(INVALID_ENTROPY);
-  // }
   const entropy = Buffer.from(entropyBytes);
   const newChecksum = deriveChecksumBits(entropy);
   if (newChecksum !== checksumBits) {
@@ -406,10 +373,4 @@ export function legacyMnemonicToEntropyBytes(
   return entropy.toString('hex');
 }
 
-export function tryFromPartialCompressedMnemonics(
-  mnemonic: string,
-  wordlist?: string[],
-): string {
-  return ""
-}
 export { wordlists } from './_wordlists';

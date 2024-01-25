@@ -10,6 +10,5 @@ export declare function getDefaultWordlist(): string;
 export declare function convertLegacyToCompressed(mnemonic: string, wordlistLegacy?: string[], wordlist8192?: string[]): string;
 export declare function convertCompressedToLegacy(mnemonic: string, wordlistLegacy?: string[], wordlist8192?: string[]): string;
 export declare function entropyToLegacyMnemonic(entropy: Buffer | string, wordlist?: string[]): string;
-export declare function legacyMnemonicToEntropyBytes(mnemonic: string, wordlist?: string[]): string;
-export declare function tryFromPartialCompressedMnemonics(mnemonic: string, wordlist?: string[]): string;
+export declare function legacyMnemonicToEntropy(mnemonic: string, wordlist?: string[]): string;
 export { wordlists } from './_wordlists';

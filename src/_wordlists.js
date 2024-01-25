@@ -63,7 +63,7 @@ try {
 catch (err) { }
 try {
     exports._default_8192 = _default_8192 = require('./wordlists/english_8192.json');
-    wordlists.english_8192 = _default_8192;
-    wordlists.EN_8192 = _default_8192;
+    wordlists.english8192 = _default_8192;
+    wordlists.EN8192 = _default_8192;
 }
 catch (err) { }
