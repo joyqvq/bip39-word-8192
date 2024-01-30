@@ -1,5 +1,13 @@
-# BIP39
+# BIP39 Word 8192
 
+A fork of [BIP39](https://github.com/bitcoinjs/bip39) that compresses mnemonics to 8 words from 12. 
+
+## Test
+```
+pnpm run build && pnpm run unit
+```
+
+# BIP 39
 [![Build Status](https://travis-ci.org/bitcoinjs/bip39.png?branch=master)](https://travis-ci.org/bitcoinjs/bip39)
 [![NPM](https://img.shields.io/npm/v/bip39.svg)](https://www.npmjs.org/package/bip39)
 
